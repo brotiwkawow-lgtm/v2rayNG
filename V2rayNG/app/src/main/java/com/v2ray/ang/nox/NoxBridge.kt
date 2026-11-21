@@ -49,7 +49,7 @@ object NoxBridge {
 
     fun addSub(name: String, url: String) {
         val id = Utils.getUuid()
-        val item = SubscriptionItem()
+        val item = SubscriptionItem(subscriptionId = id)
         item.remarks = name
         item.url = url
         MmkvManager.encodeSubscription(id, item)
