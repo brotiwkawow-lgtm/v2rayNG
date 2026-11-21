@@ -1,6 +1,9 @@
 package com.v2ray.ang.nox
 
 import android.content.ClipboardManager
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.draw.alpha
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -67,9 +70,7 @@ fun MoonSplash(night: Boolean, onDone: () -> Unit) {
         NoxBody(night, col, glow.value, Modifier.size(300.dp).graphicsAlpha(alpha.value), spin = true)
     }
 }
-
-private fun Modifier.graphicsAlpha(a: Float) = this.then(Modifier.drawWithAlpha(a))
-private fun Modifier.drawWithAlpha(a: Float) = androidx.compose.ui.draw.alpha(a)
+private fun Modifier.graphicsAlpha(a: Float) = this.alpha(a)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
