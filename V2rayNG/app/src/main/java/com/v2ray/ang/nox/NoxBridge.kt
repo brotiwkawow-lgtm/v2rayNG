@@ -4,10 +4,8 @@ import android.content.Context
 import android.util.Log
 import com.v2ray.ang.core.CoreConfigManager
 import com.v2ray.ang.core.CoreNativeManager
-import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.MmkvManager
-import com.v2ray.ang.util.Utils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
@@ -22,7 +20,15 @@ object NoxBridge {
     private const val TAG = "NoxBridge"
     private const val SERVICE_CLASS = "com.v2ray.ang.core.CoreServiceManager"
 
-    fun servers(): List<Server> = MmkvManager.decodeServerList().mapNotNull { guid ->
+    /** GUID всех серверов: ручные ("") и из каждой подписки. */
+    private fun allGuids(): List<String> {
+        val ids = listOf("") + MmkvManager.decodeSubscriptions().map { it.guid }
+        return ids.flatMap { id ->
+            runCatching { MmkvManager.decodeServerList(id) }.getOrDefault(mutableListOf())
+        }.distinct()
+    }
+
+    fun servers(): List<Server> = allGuids().mapNotNull { guid ->
         MmkvManager.decodeServerConfig(guid)?.let { p ->
             Server(
                 guid,
@@ -39,21 +45,12 @@ object NoxBridge {
 
     /** Ссылка подписки, vless/vmess/trojan/ss/hysteria2/wireguard, base64-список или JSON. */
     fun importText(text: String): Int {
-        val t = text.trim()
-        if (t.startsWith("http://") || t.startsWith("https://")) {
-            addSub(t.substringAfter("//").substringBefore("/"), t)
-            return 1
-        }
-        return AngConfigManager.importBatchConfig(t, "", false).first
+        val r = AngConfigManager.importBatchConfig(text.trim(), "", false)
+        return r.first + r.second
     }
 
     fun addSub(name: String, url: String) {
-        val id = Utils.getUuid()
-        val item = SubscriptionItem(subscriptionId = id)
-        item.remarks = name
-        item.url = url
-        MmkvManager.encodeSubscription(id, item)
-        AngConfigManager.updateConfigViaSubAll()
+        AngConfigManager.importBatchConfig(url.trim(), "", false)
     }
 
     fun updateAllSubs(): Int {
@@ -83,10 +80,7 @@ object NoxBridge {
     fun start(ctx: Context) { callService(listOf("startVService", "startService", "startCore", "start"), ctx) }
     fun stop(ctx: Context) { callService(listOf("stopVService", "stopService", "stopCore", "stop"), ctx) }
 
-    /**
-     * РЕАЛЬНЫЙ пинг: ядро делает HTTPS-запрос ЧЕРЕЗ сервер.
-     * Возвращает мс или -1 при таймауте/ошибке.
-     */
+    /** РЕАЛЬНЫЙ пинг: ядро делает HTTPS-запрос ЧЕРЕЗ сервер. -1 при таймауте/ошибке. */
     suspend fun realPing(ctx: Context, guid: String, timeoutMs: Long): Long = withContext(Dispatchers.IO) {
         try {
             CoreNativeManager.initCoreEnv(ctx)
